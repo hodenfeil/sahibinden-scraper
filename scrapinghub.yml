@@ -1,0 +1,6 @@
+# scrapinghub.yml
+project: 813896
+stacks:
+  default: scrapy:2.11
+requirements:
+  file: requirements.txt

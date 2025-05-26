@@ -1,0 +1,27 @@
+# Sanal Ortam
+.venv/
+.venv311/
+venv/
+*.pyc
+*.pyo
+*.pyd
+
+# Build Kalıntıları
+build/
+dist/
+*.egg-info/
+*.egg
+
+# PyCharm/IDE Ayarları
+.idea/
+*.swp
+*.swo
+
+# Scrapy Cloud / Zyte
+.scrapinghub/
+.zyte/
+
+# Diğer
+__pycache__/
+*.log
+*.db
