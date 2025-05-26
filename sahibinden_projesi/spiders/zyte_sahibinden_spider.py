@@ -11,7 +11,7 @@ class ZyteSahibindenSpider(scrapy.Spider):
         },
         # ÖNEMLİ: API Anahtarını Scrapy Cloud Ayarlarından (Settings -> Spider Settings)
         # ZYTE_API_KEY olarak eklemek daha güvenlidir. Eğer oradan eklerseniz bu satırı silin.
-        "ZYTE_API_KEY": "bf2eb06c893e488f9eddf6f33ed87477",
+        # "ZYTE_API_KEY": "bf2eb06c893e488f9eddf6f33ed87477",
         "ZYTE_API_ENABLED": True,
 
         "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
