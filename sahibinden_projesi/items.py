@@ -1,12 +1,11 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
+# sahibinden_projesi/items.py
 import scrapy
 
-
-class SahibindenProjesiItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
+class EbayProductItem(scrapy.Item):
+    url = scrapy.Field()
+    title = scrapy.Field()
+    price = scrapy.Field()
+    # seller = scrapy.Field()
+    # condition = scrapy.Field()
+    # image_url = scrapy.Field()
+    # ... eklemek istediğiniz diğer alanlar ...
