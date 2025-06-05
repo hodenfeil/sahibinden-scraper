@@ -6,101 +6,133 @@ class ZyteSahibindenSpiderWorking(scrapy.Spider):
     allowed_domains = ["sahibinden.com"]
 
     custom_settings = {
+        # Zyte API middleware'ini etkinleştir
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
         },
+
+        # API anahtarı
         "ZYTE_API_KEY": "d57e4ad5f6954893b785101356b9ec20",
         "ZYTE_API_ENABLED": True,
+
+        # Request fingerprinter
         "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
+
+        # Reactor
         "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+
+        # Diğer ayarlar
         "ROBOTSTXT_OBEY": False,
-        "HTTPERROR_ALLOWED_CODES": [403],
+        "HTTPERROR_ALLOWED_CODES": [403, 503],
         "CONCURRENT_REQUESTS": 1,
-        "DOWNLOAD_DELAY": 3,
-        "RETRY_TIMES": 1,  # Retry'ı azalt
+        "DOWNLOAD_DELAY": 10,  # 10 saniye bekle
+    "RANDOMIZE_DOWNLOAD_DELAY": 0.5,
+    "AUTOTHROTTLE_ENABLED": True,
+    "AUTOTHROTTLE_START_DELAY": 5,
+    "AUTOTHROTTLE_MAX_DELAY": 30,
+        "RETRY_TIMES": 3,
+        "RETRY_HTTP_CODES": [403, 500, 502, 503, 504, 408, 429],
     }
 
     def start_requests(self):
-        # Daha basit URL'lerle test et
-        test_urls = [
-            "https://www.sahibinden.com",
-            "https://www.sahibinden.com/vasita/otomobil",
-            "https://www.sahibinden.com/vasita/otomobil/renault",
-        ]
+        # Playground'da çalışan URL'yi kullan
+        url = "https://www.sahibinden.com/ilan/vasita-otomobil-renault-2022-megane-4-joy-1.3tce-140hpedc-degisensz-tramersz-tesla-ekran-1242514779/detay"
 
-        for url in test_urls:
-            yield scrapy.Request(
-                url,
-                callback=self.parse,
-                meta={
-                    "zyte_api": {
-                        "browserHtml": True,
-                        "geolocation": "US",  # TR yerine US dene
-                        "javascript": True,
+        yield scrapy.Request(
+            url,
+            callback=self.parse,
+            meta={
+                "zyte_api": {
+                    "browserHtml": True,
+                    "geolocation": "TR",
+                    "javascript": True,
+                    "actions": [
+                        {
+                            "action": "waitForTimeout",
+                            "timeout": 10000
+                        },
+                        {
+                            "action": "waitForSelector",
+                            "selector": "body",
+                            "timeout": 15000
+                        }
+                    ],
+                    "requestHeaders": {
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+                        "Accept-Encoding": "gzip, deflate, br",
+                        "Cache-Control": "max-age=0",
+                        "Upgrade-Insecure-Requests": "1",
+                        "X-Crawlera-Use-HTTPS": "1",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                     }
                 }
-            )
+            }
+        )
 
     def parse(self, response):
-        self.logger.info(f"Response status: {response.status} for {response.url}")
+        self.logger.info(f"Response status: {response.status}")
         self.logger.info(f"HTML length: {len(response.text)}")
+        self.logger.info(f"Response URL: {response.url}")
 
-        if response.status == 200:
-            self.logger.info("BAŞARILI! 200 OK alındı")
+        # 403 olsa bile HTML'i kontrol et
+        if len(response.text) > 1000:  # Yeterli HTML varsa işle
+            self.logger.info("HTML içeriği mevcut, işleniyor...")
 
-            # Ana sayfa veya kategori sayfasından ilan linklerini çek
-            ilan_links = response.css('a[href*="/ilan/"]::attr(href)').getall()
-            self.logger.info(f"Bulunan ilan sayısı: {len(ilan_links)}")
+            # HTML'i dosyaya kaydet (debug için)
+            try:
+                with open('response_debug.html', 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                self.logger.info("HTML dosyaya kaydedildi: response_debug.html")
+            except Exception as e:
+                self.logger.warning(f"HTML dosyaya kaydedilemedi: {e}")
 
-            # İlk 3 ilan linkini test et
-            for link in ilan_links[:3]:
-                if link.startswith('/'):
-                    full_url = f"https://www.sahibinden.com{link}"
-                else:
-                    full_url = link
+            # Sahibinden.com için daha spesifik CSS seçiciler
+            title = (
+                    response.css('h1.classifiedDetailTitle::text').get() or
+                    response.css('h1::text').get() or
+                    response.css('.classifiedDetailTitle::text').get()
+            )
 
-                yield scrapy.Request(
-                    full_url,
-                    callback=self.parse_detail,
-                    meta={
-                        "zyte_api": {
-                            "browserHtml": True,
-                            "geolocation": "US",
-                            "javascript": True,
-                        }
-                    }
-                )
+            price = (
+                    response.css('.classifiedInfo h3::text').get() or
+                    response.css('.price::text').get() or
+                    response.css('h3:contains("TL")::text').get()
+            )
 
-            yield {
-                "url": response.url,
-                "status": response.status,
-                "page_type": "listing",
-                "ilan_count": len(ilan_links),
-                "success": True
-            }
+            location = (
+                    response.css('.classifiedInfo ul li:contains("İl") span::text').get() or
+                    response.css('.location::text').get()
+            )
 
-        elif len(response.text) > 1000:
-            # 403 olsa bile içerik varsa kaydet
-            yield {
-                "url": response.url,
-                "status": response.status,
-                "html_length": len(response.text),
-                "page_type": "error_page"
-            }
+            # Araç detayları
+            year = response.css('.classifiedInfo ul li:contains("Yıl") span::text').get()
+            km = response.css('.classifiedInfo ul li:contains("KM") span::text').get()
+            fuel = response.css('.classifiedInfo ul li:contains("Yakıt") span::text').get()
 
-    def parse_detail(self, response):
-        """İlan detay sayfalarını işle"""
-        self.logger.info(f"Detail page status: {response.status}")
-
-        if response.status == 200:
-            title = response.css('h1::text').get()
-            price = response.css('.classifiedInfo h3::text').get()
+            # HTML içeriğinde "sahibinden" kelimesi var mı kontrol et
+            is_sahibinden_page = "sahibinden" in response.text.lower()
 
             yield {
                 "url": response.url,
                 "status": response.status,
                 "title": title,
                 "price": price,
-                "page_type": "detail",
-                "success": True
+                "location": location,
+                "year": year,
+                "km": km,
+                "fuel": fuel,
+                "html_length": len(response.text),
+                "has_content": True,
+                "is_sahibinden_page": is_sahibinden_page,
+                "html_preview": response.text[:500]  # İlk 500 karakter
+            }
+        else:
+            self.logger.warning("Yetersiz HTML içeriği")
+            yield {
+                "url": response.url,
+                "status": response.status,
+                "error": "Insufficient HTML content",
+                "html_length": len(response.text),
+                "html_preview": response.text[:200]
             }
