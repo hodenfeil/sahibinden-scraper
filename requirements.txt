@@ -1,2 +1,2 @@
-scrapy-zyte-api>=0.13.0
-scrapy>=2.11.0
+scrapy>=2.5.0
+zenrows>=1.0.0
