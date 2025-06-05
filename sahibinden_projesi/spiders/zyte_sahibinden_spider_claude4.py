@@ -1,110 +1,81 @@
 import scrapy
 
 
-class ZyteSahibindenSpiderClaude4(scrapy.Spider):
-    name = "zyte_sahibinden_spider_claude4"
+class ZyteSahibindenSpiderWorking(scrapy.Spider):
+    name = "zyte_sahibinden_spider_working"
     allowed_domains = ["sahibinden.com"]
 
     custom_settings = {
-        # Zyte API middleware'ini etkinleştir - EN ÖNEMLİ AYAR!
+        # Zyte API middleware'ini etkinleştir
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
         },
 
-        # Zyte API anahtarını buraya ekleyin (güvenlik için Scrapy Cloud Settings'den de ekleyebilirsiniz)
+        # API anahtarı
         "ZYTE_API_KEY": "d57e4ad5f6954893b785101356b9ec20",
-
-        # Zyte API'yi etkinleştir
         "ZYTE_API_ENABLED": True,
 
-        # Request fingerprinter'ı Zyte API uyumlu yap
+        # Request fingerprinter
         "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
 
-        # Async reactor kullan
+        # Reactor
         "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 
-        # robots.txt'yi görmezden gel
+        # Diğer ayarlar
         "ROBOTSTXT_OBEY": False,
-
-        # 403 hatalarını parse metoduna gönder
         "HTTPERROR_ALLOWED_CODES": [403],
-
-        # Gerçekçi User-Agent
-        "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-
-        # Retry ayarları
-        "RETRY_TIMES": 2,
-        "RETRY_HTTP_CODES": [500, 502, 503, 504, 408, 429],
-
-        # Concurrent requests'i azalt
         "CONCURRENT_REQUESTS": 1,
-        "DOWNLOAD_DELAY": 2,
+        "DOWNLOAD_DELAY": 1,
     }
 
     def start_requests(self):
-        # Test için daha basit bir URL deneyelim
-        urls = [
-            "https://www.sahibinden.com/ilan/vasita-otomobil-renault-2022-megane-4-joy-1.3tce-140hpedc-degisensz-tramersz-tesla-ekran-1242514779/detay",
-            "https://www.sahibinden.com/otomobil/ikinci-el/sahibinden?a116445=1263354&a4_max=250000",  # Fallback URL
-        ]
+        # Playground'da çalışan URL'yi kullan
+        url = "https://www.sahibinden.com/ilan/vasita-otomobil-renault-2022-megane-4-joy-1.3tce-140hpedc-degisensz-tramersz-tesla-ekran-1242514779/detay"
 
-        for url in urls:
-            yield scrapy.Request(
-                url,
-                callback=self.parse,
-                meta={
-                    "zyte_api": {
-                        "browserHtml": True,
-                        "geolocation": "TR",
-                        "httpResponseBody": True,
-                        "screenshot": False,
-                        "actions": [
-                            {
-                                "action": "waitForTimeout",
-                                "timeout": 3000  # 3 saniye bekle
-                            }
-                        ]
-                    }
-                },
-                dont_filter=True
-            )
+        yield scrapy.Request(
+            url,
+            callback=self.parse,
+            meta={
+                "zyte_api": {
+                    # Playground'da çalışan parametreleri birebir kullan
+                    "browserHtml": True,
+                    "geolocation": "TR",
+                    "javascript": True,
+                    # Ek parametreler eklemiyoruz, playground'daki gibi minimal tutuyoruz
+                }
+            }
+        )
 
     def parse(self, response):
-        self.logger.info(f"Response status: {response.status} for URL: {response.url}")
-        self.logger.info(f"Response headers: {dict(response.headers)}")
-
-        if response.status == 403:
-            self.logger.warning("403 HATASI ALINDI! Sayfa içeriği (ilk 1000 karakter):")
-            self.logger.warning(response.text[:1000])
-
-            # 403 durumunda bile bazı bilgileri kaydet
-            yield {
-                "url": response.url,
-                "status": response.status,
-                "error": "403 Forbidden",
-                "html_preview": response.text[:500]
-            }
-            return
+        self.logger.info(f"Response status: {response.status}")
+        self.logger.info(f"HTML length: {len(response.text)}")
 
         if response.status == 200:
-            self.logger.info("BAŞARILI (200)! Sayfa yüklendi.")
-            self.logger.info(f"Sayfa boyutu: {len(response.text)} karakter")
+            self.logger.info("BAŞARILI! HTML içeriği alındı.")
 
-            # Sayfadan temel bilgileri çek
-            title = response.css('h1::text').get() or response.css('title::text').get()
+            # Araç bilgilerini çek
+            title = response.css('h1::text').get()
+            price = response.css('.classifiedInfo h3::text').get()
+            location = response.css('.classifiedInfo ul li:contains("İl") span::text').get()
+
+            # HTML'i dosyaya kaydet (debug için)
+            with open('scrapy_response.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
 
             yield {
                 "url": response.url,
                 "status": response.status,
                 "title": title,
+                "price": price,
+                "location": location,
                 "html_length": len(response.text),
-                "success": True,
-                "html_preview": response.text[:1000]
+                "success": True
             }
         else:
-            self.logger.warning(f"BEKLENMEDİK DURUM: {response.status}")
+            self.logger.warning(f"Başarısız: {response.status}")
             yield {
                 "url": response.url,
                 "status": response.status,
-                "error": f"Unexpected status: {response.status}"
+                "error": f"HTTP {response.status}",
+                "html_preview": response.text[:500]
             }
