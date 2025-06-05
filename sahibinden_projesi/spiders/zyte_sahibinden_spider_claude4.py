@@ -40,17 +40,17 @@ class ZyteSahibindenSpiderWorking(scrapy.Spider):
             meta={
                 "zyte_api": {
                     "browserHtml": True,
-                    "geolocation": "TR",
-                    "javascript": True,
+                    "geolocation": "US",
+                    # "javascript": True,
                     "actions": [
                         {
                             "action": "waitForTimeout",
-                            "timeout": 10000
+                            "timeout": 20000
                         },
                         {
                             "action": "waitForSelector",
                             "selector": "body",
-                            "timeout": 15000
+                            "timeout": 30000
                         }
                     ],
                     "requestHeaders": {
