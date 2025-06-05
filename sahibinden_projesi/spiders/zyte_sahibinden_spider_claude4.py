@@ -50,32 +50,25 @@ class ZyteSahibindenSpiderWorking(scrapy.Spider):
         self.logger.info(f"Response status: {response.status}")
         self.logger.info(f"HTML length: {len(response.text)}")
 
-        if response.status == 200:
-            self.logger.info("BAŞARILI! HTML içeriği alındı.")
+        # 403 olsa bile HTML'i kontrol et
+        if len(response.text) > 1000:  # Yeterli HTML varsa işle
+            self.logger.info("HTML içeriği mevcut, işleniyor...")
 
-            # Araç bilgilerini çek
+            # HTML'i dosyaya kaydet
+            with open('response_403.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
+
+            # Veri çıkarmayı dene
             title = response.css('h1::text').get()
             price = response.css('.classifiedInfo h3::text').get()
-            location = response.css('.classifiedInfo ul li:contains("İl") span::text').get()
-
-            # HTML'i dosyaya kaydet (debug için)
-            with open('scrapy_response.html', 'w', encoding='utf-8') as f:
-                f.write(response.text)
 
             yield {
                 "url": response.url,
                 "status": response.status,
                 "title": title,
                 "price": price,
-                "location": location,
                 "html_length": len(response.text),
-                "success": True
+                "has_content": True
             }
         else:
-            self.logger.warning(f"Başarısız: {response.status}")
-            yield {
-                "url": response.url,
-                "status": response.status,
-                "error": f"HTTP {response.status}",
-                "html_preview": response.text[:500]
-            }
+            self.logger.warning("Yetersiz HTML içeriği")
