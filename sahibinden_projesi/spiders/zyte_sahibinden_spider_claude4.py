@@ -1,5 +1,6 @@
 import scrapy
 import urllib.parse
+import json
 
 
 class ZenRowsSahibindenSpider(scrapy.Spider):
@@ -26,11 +27,20 @@ class ZenRowsSahibindenSpider(scrapy.Spider):
         # Hedef URL
         target_url = "https://www.sahibinden.com/ilan/vasita-otomobil-renault-2022-megane-4-joy-1.3tce-140hpedc-degisensz-tramersz-tesla-ekran-1242514779/detay"
 
-        # URL'yi encode et
-        encoded_url = urllib.parse.quote(target_url, safe='')
+        # ZenRows API parametreleri (playground'daki gibi)
+        params = {
+            'url': target_url,
+            'apikey': zenrows_api_key,
+            'js_render': 'true',
+            'json_response': 'true',
+            'js_instructions': '[{"click":".selector"},{"wait":500},{"fill":[".input","value"]},{"wait_for":".slow_selector"}]',
+            'premium_proxy': 'true',
+            'proxy_country': 'tr',
+        }
 
-        # ZenRows API URL'sini oluştur
-        zenrows_url = f"https://api.zenrows.com/v1/?apikey={zenrows_api_key}&url={encoded_url}&js_render=true&premium_proxy=true"
+        # URL parametrelerini oluştur
+        param_string = urllib.parse.urlencode(params)
+        zenrows_url = f"https://api.zenrows.com/v1/?{param_string}"
 
         yield scrapy.Request(
             zenrows_url,
@@ -46,75 +56,145 @@ class ZenRowsSahibindenSpider(scrapy.Spider):
 
     def parse(self, response):
         self.logger.info(f"Response status: {response.status}")
-        self.logger.info(f"HTML length: {len(response.text)}")
+        self.logger.info(f"Response length: {len(response.text)}")
         self.logger.info(f"ZenRows API URL: {response.url}")
 
         # Orijinal hedef URL'yi meta'dan al
         target_url = response.meta.get("target_url")
 
-        if response.status == 200 and len(response.text) > 1000:
-            self.logger.info("HTML içeriği mevcut, işleniyor...")
+        if response.status == 200:
+            self.logger.info("ZenRows API'den başarılı yanıt alındı")
 
-            # HTML'i dosyaya kaydet (debug için)
             try:
-                with open('zenrows_response.html', 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                self.logger.info("HTML dosyaya kaydedildi: zenrows_response.html")
-            except Exception as e:
-                self.logger.warning(f"HTML dosyaya kaydedilemedi: {e}")
+                # JSON response'u parse et
+                json_data = json.loads(response.text)
+                html_content = json_data.get('html', '')
 
-            # Sahibinden.com için CSS seçiciler
-            title = (
-                    response.css('h1.classifiedDetailTitle::text').get() or
-                    response.css('h1::text').get() or
-                    response.css('.classifiedDetailTitle::text').get()
-            )
+                self.logger.info(f"HTML content length: {len(html_content)}")
 
-            price = (
-                    response.css('.classifiedInfo h3::text').get() or
-                    response.css('.price::text').get() or
-                    response.css('h3:contains("TL")::text').get()
-            )
+                # HTML'i dosyaya kaydet (debug için)
+                try:
+                    with open('zenrows_response.html', 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+                    self.logger.info("HTML dosyaya kaydedildi: zenrows_response.html")
+                except Exception as e:
+                    self.logger.warning(f"HTML dosyaya kaydedilemedi: {e}")
 
-            location = (
-                    response.css('.classifiedInfo ul li:contains("İl") span::text').get() or
-                    response.css('.location::text').get()
-            )
+                # HTML'i Scrapy response'una dönüştür
+                from scrapy.http import HtmlResponse
+                html_response = HtmlResponse(
+                    url=target_url,
+                    body=html_content.encode('utf-8'),
+                    encoding='utf-8'
+                )
 
-            # Araç detayları
-            year = response.css('.classifiedInfo ul li:contains("Yıl") span::text').get()
-            km = response.css('.classifiedInfo ul li:contains("KM") span::text').get()
-            fuel = response.css('.classifiedInfo ul li:contains("Yakıt") span::text').get()
+                # Sahibinden.com için CSS seçiciler
+                title = (
+                        html_response.css('h1.classifiedDetailTitle::text').get() or
+                        html_response.css('h1::text').get() or
+                        html_response.css('.classifiedDetailTitle::text').get()
+                )
 
-            # HTML içeriğinde "sahibinden" kelimesi var mı kontrol et
-            is_sahibinden_page = "sahibinden" in response.text.lower()
+                price = (
+                        html_response.css('.classifiedInfo h3::text').get() or
+                        html_response.css('.price::text').get() or
+                        html_response.css('h3:contains("TL")::text').get()
+                )
 
-            # 403 hata sayfası mı kontrol et
-            is_error_page = "error-page-container" in response.text
+                location = (
+                        html_response.css('.classifiedInfo ul li:contains("İl") span::text').get() or
+                        html_response.css('.location::text').get()
+                )
 
-            yield {
-                "url": target_url,
-                "zenrows_url": response.url,
-                "status": response.status,
-                "title": title,
-                "price": price,
-                "location": location,
-                "year": year,
-                "km": km,
-                "fuel": fuel,
-                "html_length": len(response.text),
-                "has_content": True,
-                "is_sahibinden_page": is_sahibinden_page,
-                "is_error_page": is_error_page,
-                "html_preview": response.text[:500]
-            }
+                # Araç detayları
+                year = html_response.css('.classifiedInfo ul li:contains("Yıl") span::text').get()
+                km = html_response.css('.classifiedInfo ul li:contains("KM") span::text').get()
+                fuel = html_response.css('.classifiedInfo ul li:contains("Yakıt") span::text').get()
+
+                # HTML içeriğinde "sahibinden" kelimesi var mı kontrol et
+                is_sahibinden_page = "sahibinden" in html_content.lower()
+
+                # 403 hata sayfası mı kontrol et
+                is_error_page = "error-page-container" in html_content
+
+                yield {
+                    "url": target_url,
+                    "zenrows_url": response.url,
+                    "status": response.status,
+                    "title": title,
+                    "price": price,
+                    "location": location,
+                    "year": year,
+                    "km": km,
+                    "fuel": fuel,
+                    "html_length": len(html_content),
+                    "has_content": True,
+                    "is_sahibinden_page": is_sahibinden_page,
+                    "is_error_page": is_error_page,
+                    "html_preview": html_content[:500],
+                    "zenrows_success": True
+                }
+
+            except json.JSONDecodeError:
+                # JSON değilse, düz HTML olarak işle
+                self.logger.info("JSON parse edilemedi, düz HTML olarak işleniyor")
+                html_content = response.text
+
+                # Sahibinden.com için CSS seçiciler
+                title = (
+                        response.css('h1.classifiedDetailTitle::text').get() or
+                        response.css('h1::text').get() or
+                        response.css('.classifiedDetailTitle::text').get()
+                )
+
+                price = (
+                        response.css('.classifiedInfo h3::text').get() or
+                        response.css('.price::text').get() or
+                        response.css('h3:contains("TL")::text').get()
+                )
+
+                location = (
+                        response.css('.classifiedInfo ul li:contains("İl") span::text').get() or
+                        response.css('.location::text').get()
+                )
+
+                # Araç detayları
+                year = response.css('.classifiedInfo ul li:contains("Yıl") span::text').get()
+                km = response.css('.classifiedInfo ul li:contains("KM") span::text').get()
+                fuel = response.css('.classifiedInfo ul li:contains("Yakıt") span::text').get()
+
+                # HTML içeriğinde "sahibinden" kelimesi var mı kontrol et
+                is_sahibinden_page = "sahibinden" in html_content.lower()
+
+                # 403 hata sayfası mı kontrol et
+                is_error_page = "error-page-container" in html_content
+
+                yield {
+                    "url": target_url,
+                    "zenrows_url": response.url,
+                    "status": response.status,
+                    "title": title,
+                    "price": price,
+                    "location": location,
+                    "year": year,
+                    "km": km,
+                    "fuel": fuel,
+                    "html_length": len(html_content),
+                    "has_content": True,
+                    "is_sahibinden_page": is_sahibinden_page,
+                    "is_error_page": is_error_page,
+                    "html_preview": html_content[:500],
+                    "zenrows_success": True
+                }
+
         else:
-            self.logger.warning("Yetersiz HTML içeriği veya hata durumu")
+            self.logger.warning("ZenRows API'den hata yanıtı")
             yield {
                 "url": target_url,
                 "zenrows_url": response.url,
                 "status": response.status,
-                "error": "Insufficient HTML content or HTTP error",
+                "error": "ZenRows API error",
                 "html_length": len(response.text),
-                "html_preview": response.text[:200]
+                "html_preview": response.text[:200],
+                "zenrows_success": False
             }
