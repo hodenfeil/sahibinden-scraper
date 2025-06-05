@@ -44,8 +44,8 @@ class ZyteSahibindenSpiderClaude4(scrapy.Spider):
     def start_requests(self):
         # Test için daha basit bir URL deneyelim
         urls = [
-            "https://www.sahibinden.com/ilan/vasita-otomobil-opel-ilk-ruhsat-sahibinden-alinma-degisensiz-kazasiz-1248665984/detay",
-            "https://www.sahibinden.com/vasita-otomobil",  # Fallback URL
+            "https://www.sahibinden.com/ilan/vasita-otomobil-renault-2022-megane-4-joy-1.3tce-140hpedc-degisensz-tramersz-tesla-ekran-1242514779/detay",
+            "https://www.sahibinden.com/otomobil/ikinci-el/sahibinden?a116445=1263354&a4_max=250000",  # Fallback URL
         ]
 
         for url in urls:
