@@ -1,6 +1,5 @@
 import scrapy
 
-
 class ZyteSahibindenSpider(scrapy.Spider):
     name = "zyte_sahibinden_spider"
     allowed_domains = ["sahibinden.com"]
