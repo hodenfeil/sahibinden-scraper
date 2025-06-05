@@ -1,7 +1,7 @@
 import scrapy
 
-class ZyteSahibindenSpider(scrapy.Spider):
-    name = "zyte_sahibinden_spider"
+class ZyteSahibindenSpiderClaude4(scrapy.Spider):
+    name = "zyte_sahibinden_spider_claude4"  # Benzersiz bir isim
     allowed_domains = ["sahibinden.com"]
 
     def start_requests(self):
@@ -20,12 +20,10 @@ class ZyteSahibindenSpider(scrapy.Spider):
 
     def parse(self, response):
         self.logger.info(f"Response status: {response.status} for URL: {response.url}")
-
         if response.status == 403:
             self.logger.warning("403 HATASI ALINDI! Sayfa içeriği (ilk 1000 karakter):")
             self.logger.warning(response.text[:1000])
             return
-
         if response.status == 200:
             self.logger.info("BAŞARILI (200)! Sayfa içeriği (ilk 500 karakter):")
             self.logger.info(response.text[:500])
