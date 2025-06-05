@@ -45,12 +45,12 @@ class ZyteSahibindenSpiderWorking(scrapy.Spider):
                     "actions": [
                         {
                             "action": "waitForTimeout",
-                            "timeout": 5000
+                            "timeout": 10000
                         },
                         {
                             "action": "waitForSelector",
                             "selector": "body",
-                            "timeout": 10000
+                            "timeout": 15000
                         }
                     ],
                     "requestHeaders": {
