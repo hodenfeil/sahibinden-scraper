@@ -1,4 +1,3 @@
-# scrapinghub.yml
 project: 814104
 stacks:
   default: scrapy:2.11
