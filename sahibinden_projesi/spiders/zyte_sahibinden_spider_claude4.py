@@ -3,7 +3,7 @@ import urllib.parse
 
 
 class ZenRowsSahibindenSpider(scrapy.Spider):
-    name = "zenrows_sahibinden_spider"
+    name = "zenrows_sahibinden_spider2"
     allowed_domains = ["api.zenrows.com", "sahibinden.com"]
 
     custom_settings = {
